@@ -23,7 +23,8 @@ cran_packages <- c(
   "progress",
   "dplyr",
   "lubridate",
-  "conflicted"
+  "conflicted",
+  "config"
 )
 
 # Install CRAN packages if needed
