@@ -25,7 +25,7 @@
 ## Project Overview
 
 ### Purpose
-This repository contains the ETL (Extract, Transform, Load) pipeline for the Jacksonville Tributary's **Florida Legislative Voting Dashboard**. The project analyzes roll call voting patterns of Florida state legislators, focusing on:
+This repository contains the ETL (Extract, Transform, Load) pipeline for the **Florida Legislative Voting Dashboard**. The project analyzes roll call voting patterns of Florida state legislators, focusing on:
 - **Party loyalty**: Legislators' tendency to vote with/against their party (0-1 scale, 1 = most loyal)
 - **Partisan lean**: Legislative electorate's partisanship (percentage point difference between D vs R voting)
 
