@@ -17,16 +17,14 @@ Detailed documentation is provided in the following sections:
 <br><br>
 
 ## Project Overview
-The Jacksonville Tributary's **[Legislative Compass](https://data.jaxtrib.org/dev/legislative-compass)** analyzes and visualizes roll call voting patterns of Florida state legislators. Key metrics include legislators' **party loyalty** and congressional district electorates' **partisan lean** and demographics. This dashboard is intended to support development of a voter guide, reporting on party polarization, and disparities between legislators and the districts they represent.
+This project provides a **[legislative voting dashboard](https://andrewpantazi.com/interactives/fl-legislative-compass.html)** to analyze roll call voting patterns of Florida state legislators, including legislators' **party loyalty** and congressional district electorates' **partisan lean** and demographics. Building on a Shiny app [originally developed by apantazi](https://github.com/apantazi/legislator_dashboard), the dashboard is intended to support development of a voter guide, reporting on party polarization, and disparities between legislators and the districts they represent.
 
 This repo contains a data pipeline which:
 * extracts [legislative voting data from LegiScan](https://legiscan.com/FL/datasets), and census and demographics data from [Daves Redistricting Maps](https://davesredistricting.org/maps#state::FL).
 * transforms data by organizing and integrating data sources
 * [reviews data quality](qa/qa_checks.log) to identify and explain anomalies
 * loads data into a Postgres database while exporting key tables as [.csv files](data-app/)
-* prepares data for use by the legislator dashboard web app (see [web app repo](https://github.com/reliablerascal/fl-legislation-app-postgres)):
-    * [production web app](https://data.jaxtrib.org/dev/legislative-compass)
-    * [staging web app](https://mockingbird.shinyapps.io/fl-leg-staging/)- currently hosted on Rob's ShinyApps.io account, but may need a new home
+* prepares data for use by the [legislator dashboard web app](https://andrewpantazi.com/interactives/fl-legislative-compass.html) (see also the [repo for the web app](https://github.com/reliablerascal/fl-legislation-app-postgres))
 
 ### Project Status
 This project is a work in progress, with the following work underway as of August 2024:
