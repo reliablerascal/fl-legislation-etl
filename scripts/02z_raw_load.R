@@ -3,16 +3,13 @@
 # This script takes data that's already been extracted from LegiScan and other sources
 # and writes it into the Postgres database VIEW layer (prior to transform)
 
-# Loop until successful connection
-repeat {
-  con <- attempt_connection()
-  
-  if (!is.null(con) && dbIsValid(con)) {
-    print("Successfully connected to the database!")
-    break
-  } else {
-    message("Failed to connect to the database. Please try again.")
-  }
+# connect to Postgres database
+con <- attempt_connection()
+
+if (!is.null(con) && dbIsValid(con)) {
+  print("Successfully connected to the database!")
+} else {
+  message("Failed to connect to the database. Please try again.")
 }
 
 #####################
@@ -32,39 +29,24 @@ list_tables <- c(
 )
 write_tables_in_list(con, schema_name, list_tables)
 
-#####################
-#                   #  
-# save user-entered #
-#                   #
-#####################
-
-schema_name <- "raw_user_entry"
-dbExecute(con, paste0("CREATE SCHEMA IF NOT EXISTS ", schema_name))
-
-list_tables <- c(
-  "user_incumbents_challenged",
-  "user_bill_categories"
-)
-
-write_tables_in_list(con, schema_name, list_tables)
-
 ###############################
 #                             #  
-# save Daves District Data    #
+# save Misc CSVs              #
 #                             #
 ###############################
 
-schema_name <- "raw_daves"
+schema_name <- "raw_misc_csvs"
 dbExecute(con, paste0("CREATE SCHEMA IF NOT EXISTS ", schema_name))
 
 list_tables <- c(
   "t_daves_districts_house",
-  "t_daves_districts_senate"
+  "t_daves_districts_senate",
+  "t_myfloridahouse",
+  "user_legislator_events",
+  "user_bill_categories"
 )
 
 write_tables_in_list(con, schema_name, list_tables)
-
-
 
 # Close the connection
 dbDisconnect(con)

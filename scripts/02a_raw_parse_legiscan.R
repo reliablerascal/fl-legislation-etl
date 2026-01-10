@@ -7,8 +7,18 @@
 # adapted from code originally written by Andrew Pantazi
 # June 2024
 
-#for testing phase only? set working directory to the location of current script
-setwd(script_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+################################
+#                              #  
+# 1a) configure parse settings #
+#                              #
+################################
+
+setting_parse_start_year <- 2023
+setting_parse_end_year <- 2024
+
+#set working directory to the location of current script, in case this is run independently
+script_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(script_dir)
 
 ################################
 #                              #  
@@ -55,7 +65,8 @@ extract_bill <- function(input_bill_path, pb) {
     number = safe_get(bill$bill_number),
     bill_id = safe_get(bill$bill_id),
     session_id = safe_get(bill$session_id),
-    session_string = session_info,
+    session = session_info,
+    #session_string = session_info,
     session_name = safe_get(bill$session$session_name),
     url = safe_get(bill$url),
     state_link = safe_get(bill$state_link), #RR added b/c it's not tracked in votes JSON
@@ -198,14 +209,15 @@ extract_votes <- function(votes, roll_call_id, session_info, pb) {
 
 options(scipen = 999) # numeric values in precise format
 
-# For now, only working with folder data-raw/legiscan/2023-2024
-# To look at all years:
-# base_dir <- "../data-raw/legiscan/2010-2024/
-base_dir <- "../data-raw/legiscan/2023-2024/"
+parse_years <- as.character(setting_parse_start_year:setting_parse_end_year)
+parse_pattern <- paste0("/(",paste(parse_years,collapse="|"),")")
+
+base_dir <- "../data-raw/legiscan/FL/"
 all_json_paths <- list.files(path = base_dir, pattern = "\\.json$", full.names = TRUE, recursive = TRUE)
-text_paths_bills <- all_json_paths[grepl("/bill/", all_json_paths, ignore.case = TRUE)]
-text_paths_legislators <- all_json_paths[grepl("/people/", all_json_paths, ignore.case = TRUE)]
-text_paths_votes <- all_json_paths[grepl("/vote/", all_json_paths, ignore.case = TRUE)]
+filtered_json_paths <- grep(parse_pattern, all_json_paths, value=TRUE)
+text_paths_bills <- filtered_json_paths[grepl("/bill/", filtered_json_paths, ignore.case = TRUE)]
+text_paths_legislators <- filtered_json_paths[grepl("/people/", filtered_json_paths, ignore.case = TRUE)]
+text_paths_votes <- filtered_json_paths[grepl("/vote/", filtered_json_paths, ignore.case = TRUE)]
 
 
 

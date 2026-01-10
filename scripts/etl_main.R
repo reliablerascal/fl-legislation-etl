@@ -3,17 +3,30 @@
 # ETL_MAIN.R                    #
 #                               #
 #################################
-# JUNE and JULY 2024
 # This script transforms data that's already been requested or downloaded from LegiScan
-# and stored in the folder fl-regular-json (eventually will be in Postgres db)
-# remove comment on source("01_request_api_legiscan.R") below to renew API requests, but be wary of API limits
+# and stored in the folder fl-regular-json
+
+#################################
+#                               #  
+# starting up the database(s)   #
+#                               #
+#################################
+# These scripts write data to either the staging or production database in Postgres.
+# Prior to running these scripts, make sure you've started up the staging and production databases
+# and selected the appropriate source in the command line.
+# For detailed steps, see the PROCEDURES document
+# https://docs.google.com/document/d/1MyGv2wjyfbNeb2WDrN0YXwZ2sJWINx0Oii3WKnUMDkA/edit#bookmark=id.5j94239a3ie
 
 #################################
 #                               #  
 # load libraries & functions    #
 #                               #
 #################################
-# these libraries need to be installed prior to loading (see install-packages.R)
+#set working directory to the location of current script
+script_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(script_dir)
+
+source("00_install_packages.R") #only install packages not already installed 
 
 library(tidyr) #for replace_na function used maybe once in 03_transform 
 library(tidyverse)  # A collection of R packages for data science
@@ -35,11 +48,8 @@ library(dplyr) # allows excluding specific columns by name from sql commands (e.
 
 library(googlesheets4) # for reading a publicly shared Google sheet
 
-#set working directory to the location of current script
-setwd(script_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
-
 source("functions_database.R") # functions to write to Postgres database
-#source("01_request_api_legiscan.R") #request LegiScan data from API 
+source("01_request_api_legiscan.R") #request LegiScan data from API 
 
 #ETL for raw layer
 source("02a_raw_parse_legiscan.R")

@@ -20,15 +20,15 @@ p_bills <- t_bills %>%
   )
 
 p_sessions <- p_bills %>%
-  select(session_id,session_name,session_string) %>%
+  select(session_id,session_name,session, two_year_period) %>%
   distinct() %>%
   mutate(
     session_year = as.numeric(substr(session_name,1,4)),
-    session_biennium = paste(
-      if_else(session_year %% 2 == 0, session_year - 1, session_year),
-      if_else(session_year %% 2 == 0, session_year, session_year + 1),
-      sep = "-"
-    )
+    # session_biennium = paste(
+    #   if_else(session_year %% 2 == 0, session_year - 1, session_year),
+    #   if_else(session_year %% 2 == 0, session_year, session_year + 1),
+    #   sep = "-"
+    # )
   )
 
 # roll_call_id should remain as an integer- see ls_bill_vote at https://api.legiscan.com/dl/Database_ERD.png
@@ -63,20 +63,29 @@ hist_leg_sessions <- t_legislator_sessions %>%
       TRUE ~ role
     ))
 
-# manually terminated two legislators
-# Hawkings (House 35) who resigned on 6/30/23, people_id = 21981
-# Fernandez-Barquin (House 118) who resigned on 6/16/23, people_id = 20023
-temp_legislators_terminated <- data.frame(
-  people_id = c(21981, 20023),
-  termination_date = as.Date(c("2023-06-30", "2023-06-16"))
-)
+# for user-entered info on legislator termination, see https://docs.google.com/spreadsheets/d/1woSZBU5bOfTGFKtuaYg2xT8jCo314RVlSpMrSARWl1c/edit?gid=0#gid=0
+calc_leg_terminated <- 
+  user_legislator_events %>% 
+    filter (event =="terminated") %>%
+    left_join(hist_leg_sessions,by = c('chamber','district_number','last_name')) %>%
+    mutate (termination_date = date, temp_name = last_name) %>%
+    select (people_id, termination_date, temp_name) %>%
+    group_by(people_id) %>%
+    summarize(
+      termination_date = max(termination_date, na.rm = TRUE),  # or min(termination_date) depending on your need
+      temp_name = first(temp_name)  # or any other method to select a name
+    ) %>%
+    ungroup()
 
 p_legislators <- hist_leg_sessions %>%
   group_by(legislator_name) %>%
   slice(1) %>%
   ungroup() %>%
-  left_join(temp_legislators_terminated, by="people_id") %>%
-  select(-role,-role_id,-party_id,-district, -committee_id, -committee_sponsor, -state_federal, -session)
+  left_join(calc_leg_terminated, by="people_id") %>%
+  select(-role,-role_id,-party_id,-district, -committee_id, -committee_sponsor, -state_federal, -session, -temp_name) %>%
+  left_join(t_myfloridahouse %>% select(district_number, last_name, mfh_member_id), 
+            by = c("district_number", "last_name")) %>%
+  mutate(mfh_member_id = ifelse(chamber == 'House', mfh_member_id, NA))
 
 p_legislator_votes <- t_legislator_votes %>%
   inner_join(hist_leg_sessions %>%
@@ -88,9 +97,6 @@ p_legislator_votes <- t_legislator_votes %>%
 jct_bill_categories <- user_bill_categories %>%
   inner_join(p_sessions %>% select(session_year,session_id), by = 'session_year') %>%
   inner_join(p_bills %>% select(bill_number,session_id,bill_id), by=c('bill_number','session_id'))
-
-# user_incumbents_challenged <- user_incumbents_challenged %>%
-#   mutate(is_incumbent_primaried = TRUE)
 
 ##########################################
 #                                        #  
@@ -226,17 +232,17 @@ calc_votes02_w_partisan_stats <- calc_votes01_both_parties_present %>%
   mutate(
     vote_with_dem_majority = ifelse((dem_majority == "Y" & vote_text == "Yea")|dem_majority=="N" & vote_text=="Nay", 1, 0),
     vote_with_gop_majority = ifelse((gop_majority == "Y" & vote_text == "Yea")|gop_majority=="N" & vote_text=="Nay", 1, 0),
-    vote_with_neither = ifelse(
+    vote_against_both = ifelse(
       (dem_majority == "Y" & gop_majority == "Y" & vote_text == "Nay") | (dem_majority == "N" & gop_majority == "N" & vote_text == "Yea"), 1, 0),
-    voted_at_all = (vote_with_dem_majority+vote_with_gop_majority+vote_with_neither)>=1,
-    maverick_votes=ifelse(
+    voted_at_all = (vote_with_dem_majority+vote_with_gop_majority+vote_against_both)>=1,
+    vote_cross_party=ifelse(
       (party=="D" & vote_text=="Yea" & dem_majority=="N" & gop_majority=="Y") |
         (party=="D" & vote_text=="Nay" & dem_majority=="Y" & gop_majority=="N") |
         (party=="R" & vote_text=="Yea" & gop_majority=="N" & dem_majority=="Y") |
         (party=="R" & vote_text=="Nay" & gop_majority=="Y" & dem_majority=="N"),
       1,0 ),
     ## RR added 7/16/24, vote with same party's majority regardless of oppo party majority 
-    vote_with_same = ifelse(
+    vote_party_line = ifelse(
       (vote_with_dem_majority & party == "D")|
         (vote_with_gop_majority & party == "R")
       , 1, 0)
@@ -260,11 +266,11 @@ calc_votes02_w_partisan_stats <- calc_votes01_both_parties_present %>%
 calc_votes03_categorized <- calc_votes02_w_partisan_stats %>%
   mutate(
     partisan_vote_type = case_when(
-      vote_with_neither == 1 ~ "Against Both Parties",
-      maverick_votes == 1 ~ "Cross Party",
+      vote_against_both == 1 ~ "Against Both Parties",
+      vote_cross_party == 1 ~ "Cross Party",
       party=="D" & vote_with_dem_majority == 1 & vote_with_gop_majority == 0 ~ "Party Line Partisan",
       party=="R" & vote_with_dem_majority == 0 & vote_with_gop_majority == 1 ~ "Party Line Partisan",
-      vote_with_same == 1 ~ "Party Line Bipartisan",
+      vote_party_line == 1 ~ "Party Line Bipartisan",
       vote_text == "NV" ~ "Absent/NV",
       vote_text == "Absent" ~ "Absent/NV",
       TRUE ~ "Other"
@@ -273,23 +279,21 @@ calc_votes03_categorized <- calc_votes02_w_partisan_stats %>%
   )
 
 #7/26/24 RR can get rid of this section when we confirm the new partisan_vote_type calculation is good
-calc_votes03_categorized <- calc_votes03_categorized %>%
-  mutate(
-    partisan_vote_type_OLD = case_when(
-      vote_with_neither == 1 ~ "Against Both Parties",
-      maverick_votes == 1 ~ "Cross Party",
-      vote_with_same == 1 ~ "Party Line",
-      TRUE ~ "Other"
-    ) %>%
-      factor(levels = c("Against Both Parties", "Cross Party", "Party Line", "Other"))
-  )
-
-table(calc_votes03_categorized$partisan_vote_type_OLD,calc_votes03_categorized$partisan_vote_type)
+# calc_votes03_categorized <- calc_votes03_categorized %>%
+#   mutate(
+#     partisan_vote_type_OLD = case_when(
+#       vote_with_neither == 1 ~ "Against Both Parties",
+#       maverick_votes == 1 ~ "Cross Party",
+#       vote_with_same == 1 ~ "Party Line",
+#       TRUE ~ "Other"
+#     ) %>%
+#       factor(levels = c("Against Both Parties", "Cross Party", "Party Line", "Other"))
+#   )
 
 # fold calculated partisan_vote_type into p_legislator_votes data frame
 p_legislator_votes <- p_legislator_votes %>%
   left_join(calc_votes03_categorized %>%
-              select(people_id,roll_call_id,partisan_vote_type),
+              select(people_id,roll_call_id,partisan_vote_type, vote_against_both, vote_with_dem_majority, vote_with_gop_majority, vote_cross_party, vote_party_line, voted_at_all),
             by = c('people_id','roll_call_id')
   )
 

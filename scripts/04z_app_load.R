@@ -3,21 +3,23 @@
 # This script takes data that's already been extracted and transformed from LegiScan and other sources
 # and writes it into the Postgres database fl_leg_votes
 
+#set working directory to the location of current script, in case this is run independently
+script_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(script_dir)
+
 ########################################
 #                                      #  
 # 1) connect to Postgres server        #
 #                                      #
 ########################################
 # Loop until successful connection
-repeat {
-  con <- attempt_connection()
+# connect to Postgres database
+con <- attempt_connection()
 
-  if (!is.null(con) && dbIsValid(con)) {
-    print("Successfully connected to the database!")
-    break
-  } else {
-    message("Failed to connect to the database. Please try again.")
-  }
+if (!is.null(con) && dbIsValid(con)) {
+  print("Successfully connected to the database!")
+} else {
+  message("Failed to connect to the database. Please try again.")
 }
 
 #############################################

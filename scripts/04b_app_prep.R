@@ -45,7 +45,7 @@ app01_vote_patterns <- app01_vote_patterns %>%
   left_join(qry_legislators_incumbent %>%
               select(legislator_name, leg_party_loyalty), by = "legislator_name") %>%
   left_join(qry_roll_calls %>%
-              select(roll_call_id, rc_mean_partisanship), by = "roll_call_id") %>%
+              select(roll_call_id, rc_mean_partisanship, rc_unity_R, rc_unity_D), by = "roll_call_id") %>%
   mutate(
     is_include_d = roll_call_id %in% calc_d_partisan_rc$roll_call_id,
     is_include_r = roll_call_id %in% calc_r_partisan_rc$roll_call_id
@@ -78,25 +78,36 @@ app02_leg_activity <- qry_leg_votes %>%
       !is.na(session) & 
       (vote_text == "Yea" | vote_text == "Nay") &
       !is.na(partisan_vote_type)
-  ) %>%
+  ) %>% 
   left_join(
     qry_bills %>%
-      select(bill_id, bill_desc), by = 'bill_id'
+      select(bill_id, bill_desc, state_link), 
+    by = 'bill_id'
   ) %>%
   left_join(
     qry_legislators_incumbent %>%
       select(people_id, district_number, chamber, last_name, ballotpedia), 
     by = 'people_id'
   ) %>%
-  left_join(
-    qry_roll_calls %>%
-      select(roll_call_id, D_pct_of_present, R_pct_of_present),
-    by = 'roll_call_id'
-  )
-
-
-
-
+  left_join(qry_roll_calls %>% select(roll_call_id, D_pct_of_present, R_pct_of_present), by = 'roll_call_id') %>% 
+  mutate( # renames field names used in app02 as of 8/7/24 while retaining original fields
+    D = D_pct_of_present,
+    R = R_pct_of_present,
+    maverick_votes = vote_cross_party,
+    vote_with_same = vote_party_line,
+    vote_with_neither = vote_against_both
+  ) %>%
+  select(
+    people_id, vote_id, vote_text, roll_call_id, session, party, legislator_name,
+    bill_id, roll_call_date, roll_call_desc, yea, nay, nv, absent, n_total,
+    passed, roll_call_chamber, bill_title, bill_number, session_year, bill_url,
+    pct_of_total, n_present, pct_of_present, final_vote, termination_date,
+    partisan_vote_type, R, D, bill_desc, district_number,
+    chamber, last_name, ballotpedia, 
+    vote_with_dem_majority, vote_with_gop_majority, vote_with_neither,
+    voted_at_all, maverick_votes, vote_with_same, state_link,D_pct_of_present,R_pct_of_present,party_loyalty_weight
+  ) %>% 
+  mutate(roll_call_date = lubridate::ymd(roll_call_date))
 
 #################################
 #                               #  
@@ -108,7 +119,8 @@ app03_district_context <- qry_legislators_incumbent %>%
   select (
     people_id,party,legislator_name,last_name,ballotpedia,district_number,chamber,termination_date, setting_party_loyalty,leg_party_loyalty,leg_n_votes_denom_loyalty,
     leg_n_votes_party_line_partisan,leg_n_votes_party_line_bipartisan,leg_n_votes_cross_party,leg_n_votes_absent_nv,leg_n_votes_independent, leg_n_votes_other,
-    rank_partisan_leg_R, rank_partisan_leg_D
+    rank_partisan_leg_R, rank_partisan_leg_D,
+    mfh_member_id
     ) %>%
   left_join(qry_districts)
 
@@ -122,22 +134,38 @@ app03_district_context_state <- qry_state_summary
 # recreating Yuriko Schumacher's partisanship visual from https://www.texastribune.org/2023/12/18/mark-jones-texas-senate-special-2023-liberal-conservative-scores/
 # first iteration: intent is to emulate the visual, though "partisanship" metric isn't identical
 
-# viz_partisanship <- qry_legislators_incumbent %>%
-#       select(legislator_name, party, chamber, district_number, leg_n_votes_denominator, leg_party_loyalty) %>%
-#   mutate(
-#     sd_partisan_vote = qry_leg_votes %>%
-#       filter(!is.na(partisan_vote_type), is.na(termination_date), partisan_vote_type != "Against Both Parties, roll_call_date >= as.Date("2012-11-10")) %>%  # Combined filters
-#       group_by(legislator_name) %>%
-#       summarize(sd_partisan_vote = sd(partisan_vote_type, na.rm = TRUE)) %>%
-#       pull(sd_partisan_vote),
-#     se_partisan_vote = sd_partisan_vote / sqrt(leg_n_votes_denominator),
-#     lower_bound = leg_party_loyalty - se_partisan_vote,
-#     upper_bound = leg_party_loyalty + se_partisan_vote,
-#     leg_label = paste0(legislator_name, " (", substr(party,1,1), "-", district_number,")")
-#   )
-# 
-# viz_partisan_senate_d <- viz_partisanship %>%
-#   filter(party == 'D', chamber == 'Senate')
-# 
-# viz_partisan_senate_r <- viz_partisanship %>%
-#   filter(party == 'R', chamber == 'Senate')
+viz_partisanship <- qry_legislators_incumbent %>%
+      select(legislator_name, party, chamber, district_number, leg_n_votes_denom_loyalty, leg_party_loyalty) %>%
+  mutate(
+    sd_partisan_vote = qry_leg_votes %>%
+      filter(!is.na(partisan_vote_type), is.na(termination_date), partisan_vote_type != "Against Both Parties",
+      roll_call_date >= as.Date("2012-11-10")) %>%  # Combined filters
+      group_by(legislator_name) %>%
+      summarize(sd_partisan_vote = sd(leg_party_loyalty , na.rm = TRUE)) %>%
+      pull(sd_partisan_vote),
+    se_partisan_vote = sd_partisan_vote / sqrt(leg_n_votes_denom_loyalty),
+    lower_bound = leg_party_loyalty - se_partisan_vote,
+    upper_bound = leg_party_loyalty + se_partisan_vote,
+    leg_label = paste0(legislator_name, " (", substr(party,1,1), "-", district_number,")")
+  )
+
+viz_partisan_senate_d <- viz_partisanship %>%
+  filter(party == 'D', chamber == 'Senate')
+
+viz_partisan_senate_r <- viz_partisanship %>%
+  filter(party == 'R', chamber == 'Senate')
+
+
+## the below plot works. it shows loyalty of a given chamber/party with error bars ##
+# loyalty_plot <- ggplot(viz_partisan_senate_d, aes(x = leg_party_loyalty, y = reorder(leg_label, leg_party_loyalty))) +
+#   geom_point(color = "red", size = 3) +
+#   geom_errorbarh(aes(xmin = lower_bound, xmax = upper_bound), height = 0.2, color = "gray") +
+#   geom_vline(xintercept = 0.5, linetype = "solid") +
+#   theme_minimal() +
+#   labs(x = "Party Loyalty", y = "", title = "Legislator Party Loyalty") +
+#   theme(
+#     panel.grid.major.y = element_blank(),
+#     panel.grid.minor.y = element_blank()
+#   )+
+#   annotate("text", x = min(viz_partisan_senate_d$leg_party_loyalty)*.8, y = 1, label = "<--- Less Loyal", hjust = 0) +
+#   annotate("text", x = 0.9, y = 1, label = "More Loyal --->", hjust = 1)

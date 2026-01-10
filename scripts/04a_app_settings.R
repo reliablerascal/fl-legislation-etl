@@ -25,13 +25,12 @@ setting_demo_year <- 2022
 # d) partisan_cross: 0 party line partisan, 1 cross party. excludes party line bipartisan
 setting_party_loyalty <- "partisan_cross"
 
-# Setting 3: Select election result for calculating district partisan lean. Should be a list of two or more elections, chosen from:
+# Setting 3: Select election result for calculating district partisan lean. Should be a dataframe with elections and weights, chosen from:
 # 16_PRES
 # 18_GOV
 # 20_PRES
 # 22_GOV
 # see 03a_process.R to make more election results available
-#setting_district_lean <- c("20_PRES","22_GOV") #2016-2020 composite results of governor and presidential election results
 setting_district_lean <- data.frame(
   source = c("16_PRES", "18_GOV", "20_PRES", "22_GOV"),
   weight = c(0.10,0.10,0.5,0.3),
@@ -86,29 +85,59 @@ calc_mean_partisan_leg <- qry_leg_votes %>%
     leg_n_votes_missing = sum(is.na(partisan_vote_type))
   )
 
-# calculate mean roll-call-level partisan vote weight
-calc_mean_partisan_rc <- qry_leg_votes %>%
-  group_by(roll_call_id) %>%
+# old method, ungrouped. to delete after app01 is no longer dependent on rc_mean_partisanship
+calc_rc_unity_ungrouped_OLD <- qry_leg_votes %>%
   filter(roll_call_date >= as.Date("11/10/2012")) %>%
+  group_by(roll_call_id) %>%
   summarize(
-    #rc_mean_partisanship=mean(party_loyalty_weight, na.rm = TRUE),
-    #rc_n_votes_denominator = sum(!is.na(party_loyalty_weight)),
     rc_n_votes_party_line_partisan = sum(partisan_vote_type=="Party Line Partisan", na.rm = TRUE),
     rc_n_votes_party_line_bipartisan = sum(partisan_vote_type=="Party Line Bipartisan", na.rm = TRUE),
     rc_n_votes_cross_party= sum(partisan_vote_type=="Cross Party", na.rm = TRUE),
     rc_n_votes_absent_nv = sum(partisan_vote_type == "Absent/NV", na.rm = TRUE),
     rc_n_votes_independent = sum(partisan_vote_type=="Against Both Parties", na.rm = TRUE),
-    rc_n_votes_other= sum(partisan_vote_type=="Other", na.rm = TRUE)
+    rc_n_votes_other= sum(partisan_vote_type=="Other", na.rm = TRUE),
+    .groups = 'drop'  # To avoid grouping on output if not needed
   ) %>%
   mutate(
     rc_with_party = (rc_n_votes_party_line_partisan + rc_n_votes_party_line_bipartisan),
     rc_against_party = (rc_n_votes_cross_party + rc_n_votes_independent),
     rc_mean_partisanship = rc_with_party/(rc_with_party + rc_against_party)
+  ) %>%
+  select(roll_call_id,rc_mean_partisanship)
+
+# calculate mean roll-call-level partisan vote weight by party
+calc_mean_partisan_rc_by_party <- qry_leg_votes %>%
+  filter(roll_call_date >= as.Date("11/10/2012")) %>%
+  group_by(roll_call_id, party) %>%
+  summarize(
+    rc_n_votes_party_line_partisan = sum(partisan_vote_type=="Party Line Partisan", na.rm = TRUE),
+    rc_n_votes_party_line_bipartisan = sum(partisan_vote_type=="Party Line Bipartisan", na.rm = TRUE),
+    rc_n_votes_cross_party= sum(partisan_vote_type=="Cross Party", na.rm = TRUE),
+    rc_n_votes_absent_nv = sum(partisan_vote_type == "Absent/NV", na.rm = TRUE),
+    rc_n_votes_independent = sum(partisan_vote_type=="Against Both Parties", na.rm = TRUE),
+    rc_n_votes_other= sum(partisan_vote_type=="Other", na.rm = TRUE),
+    .groups = 'drop'  # To avoid grouping on output if not needed
+  ) %>%
+  mutate(
+    rc_with_party = (rc_n_votes_party_line_partisan + rc_n_votes_party_line_bipartisan),
+    rc_against_party = (rc_n_votes_cross_party + rc_n_votes_independent),
+    rc_mean_partisanship = rc_with_party/(rc_with_party + rc_against_party)
+  ) %>%
+  select(roll_call_id,party,rc_mean_partisanship)
+
+calc_rc_party_unity <- calc_mean_partisan_rc_by_party %>%
+  pivot_wider(
+    names_from = party,
+    values_from = rc_mean_partisanship,
+    names_prefix = "rc_unity_"
   )
 
-# roll call summaries, 6271
+# roll call summaries
 qry_roll_calls <- p_roll_calls %>%
-  left_join(calc_mean_partisan_rc,
+  left_join(calc_rc_party_unity,
+            by = 'roll_call_id'
+  ) %>%
+  left_join(calc_rc_unity_ungrouped_OLD,
             by = 'roll_call_id'
   )
 
@@ -137,8 +166,8 @@ calc_elections_avg <- calc_elections_weighted %>%
   ) %>%
   mutate(
     avg_party_lean = ifelse(avg_pct_D > avg_pct_R, 'D', 'R'),
-    avg_party_lean_points_abs = round(abs(avg_pct_R - avg_pct_D) * 100, 0),
-    avg_party_lean_points_R = round((avg_pct_R - avg_pct_D) * 100, 0)
+    avg_party_lean_points_abs = round(abs(avg_pct_R - avg_pct_D) * 100, 1),
+    avg_party_lean_points_R = round((avg_pct_R - avg_pct_D) * 100, 1)
   )
 
 
