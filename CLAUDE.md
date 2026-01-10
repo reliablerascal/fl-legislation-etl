@@ -30,7 +30,7 @@ This repository contains the ETL (Extract, Transform, Load) pipeline for the Jac
 - **Partisan lean**: Legislative electorate's partisanship (percentage point difference between D vs R voting)
 
 ### Live Application
-- Dashboard: https://mockingbird.shinyapps.io/fl-leg-app-postgres/
+- Dashboard: https://andrewpantazi.com/interactives/fl-legislative-compass.html
 - App Repository: https://github.com/reliablerascal/fl-legislation-app-postgres
 
 ### Key Terminology
@@ -494,7 +494,7 @@ source("01_request_api_legiscan.R")
 
 ### External Links
 - LegiScan Database ERD: https://api.legiscan.com/dl/Database_ERD.png
-- Live Dashboard: https://mockingbird.shinyapps.io/fl-leg-app-postgres/
+- Live Dashboard: https://andrewpantazi.com/interactives/fl-legislative-compass.html
 - App Repository: https://github.com/reliablerascal/fl-legislation-app-postgres
 - Original Project: https://github.com/apantazi/legislator_dashboard
 
